@@ -1,0 +1,5 @@
+# Ignore .env file in student-project-tracker
+2.0 - Dockerise your App/student-project-tracker/.env
+
+# Ignore vault secret YAML file
+4.0 - Deploy to K8s/vault-secret.yaml
