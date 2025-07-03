@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: dolatunj1012/student-tracker:latest
+    ports:
+    - containerPort: 80
+    env:
+    - name: VAULT_ADDR
+      valueFrom:
+        secretKeyRef:
+          name: vault-secrets
+          key: VAULT_ADDR
+    - name: VAULT_ROLE_ID
+      valueFrom:
+        secretKeyRef:
+          name: vault-secrets
+          key: VAULT_ROLE_ID
+    - name: VAULT_SECRET_ID
+      valueFrom:
+        secretKeyRef:
+          name: vault-secrets
+          key: VAULT_SECRET_ID
