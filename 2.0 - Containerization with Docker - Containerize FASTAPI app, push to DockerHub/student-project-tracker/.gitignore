@@ -1,0 +1,9 @@
+.env
+__pycache__/
+Cloud_Native_env/
+.elasticbeanstalk/
+*.log
+.aws/
+*.pem
+*.key
+Dockerrun.aws.json
