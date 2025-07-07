@@ -1,5 +1,19 @@
 # Ignore .env file in student-project-tracker
-2.0 - Dockerise your App/student-project-tracker/.env
+*.env
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+Cloud_Native_env/
+.venv/
+
+# AWS and deployment credentials
+.aws/
+Dockerrun.aws.json
+.elasticbeanstalk/
 
 # Ignore vault secret YAML file
 4.0 - Deploy to K8s/vault-secret.yaml
