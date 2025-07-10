@@ -60,6 +60,12 @@ docker build -t student-tracker .
 
 ### 2. Run Docker Container
 ```bash
+# User tries this first (will fail)
+docker run -p 8000:8000 student-tracker
+
+# Gets this error:
+# EnvironmentError: Missing one or more Vault environment variables
+
 docker run --env-file .env -p 8000:8000 student-tracker
 ```
 
