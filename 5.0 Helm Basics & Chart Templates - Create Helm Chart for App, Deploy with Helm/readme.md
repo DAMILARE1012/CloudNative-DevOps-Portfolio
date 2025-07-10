@@ -346,3 +346,18 @@ Congratulations! 🎉 Your application is now deployed using Helm. In Week 6, yo
 
 **Keep your Helm deployment running - we'll use it in the next week!**
 
+<hr>
+
+```
+# 1. Restart Kind cluster
+kind create cluster --name student-tracker
+
+# 2. Reinstall NGINX Ingress Controller
+helm repo update
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+
+# 3. Redeploy your app
+cd student-tracker
+helm install student-tracker . -n my-app --create-namespace -f my-value.yml
+```
