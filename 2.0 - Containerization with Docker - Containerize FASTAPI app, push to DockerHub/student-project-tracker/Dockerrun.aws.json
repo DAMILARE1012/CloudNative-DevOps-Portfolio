@@ -1,0 +1,27 @@
+{
+  "AWSEBDockerrunVersion": "1",
+  "Image": {
+    "Name": "dolatunj1012/student-tracker:latest",
+    "Update": "true"
+  },
+  "Ports": [
+    {
+      "ContainerPort": "8000",
+      "HostPort": "80"
+    }
+  ],
+  "Environment": [
+    {
+      "Name": "VAULT_ADDR",
+      "Value": "http://44.204.193.107:8200"
+    },
+    {
+      "Name": "VAULT_ROLE_ID", 
+      "Value": "f7af58b1-5c22-7c2d-c659-0425d9ce94b2"
+    },
+    {
+      "Name": "VAULT_SECRET_ID",
+      "Value": "d5f736da-785b-8f5c-9258-48d5d7c43c06"
+    }
+  ]
+}
