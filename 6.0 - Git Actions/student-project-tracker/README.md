@@ -178,35 +178,6 @@ Located in `.github/workflows/student-tracker-ci_cd.yml`
 
 ---
 
-## 📬 **API Endpoints**
-
-| Method | Endpoint | Description | Example |
-|--------|----------|-------------|---------|
-| `GET` | `/` | Home page with student count | N/A |
-| `GET` | `/register` | Registration form | N/A |
-| `POST` | `/register` | Register new student | `name=John Doe` |
-| `GET` | `/progress` | Progress tracking form | N/A |
-| `POST` | `/progress` | View student progress | `name=John Doe` |
-| `GET` | `/docs` | API documentation | N/A |
-
-### **Example API Usage:**
-```bash
-# Health check
-curl http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com/docs
-
-# Register student
-curl -X POST "http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com/register" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "name=Jane Smith"
-
-# Check progress
-curl -X POST "http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com/progress" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "name=Jane Smith"
-```
-
----
-
 ## 🔧 **Advanced Configuration**
 
 ### **Environment Variables:**
@@ -284,35 +255,6 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
    - Test application endpoints
    - Monitor health checks
 
-### **Manual Deployment (Emergency):**
-```bash
-# Build and push to ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 972936183609.dkr.ecr.us-east-1.amazonaws.com
-docker build -t student_tracker .
-docker tag student_tracker:latest 972936183609.dkr.ecr.us-east-1.amazonaws.com/student_tracker:latest
-docker push 972936183609.dkr.ecr.us-east-1.amazonaws.com/student_tracker:latest
-
-# Update ECS service
-aws ecs update-service --cluster student_tracker_cluster --service student_tracker_service --force-new-deployment
-```
-
----
-
-## 📊 **Project Metrics**
-
-### **Development Stats:**
-- 📦 **Containers**: 1 production container
-- 🔄 **CI/CD Runs**: Automated on every push
-- ☁️ **Cloud Resources**: 5+ AWS services integrated
-- 🕐 **Deployment Time**: ~5 minutes end-to-end
-- 🎯 **Success Rate**: 99%+ deployment success
-
-### **Performance Benchmarks:**
-- ⚡ **Cold Start**: < 10 seconds
-- 🏃 **Response Time**: < 500ms average
-- 📈 **Throughput**: 100+ requests/second
-- 💾 **Memory Usage**: ~200MB runtime
-
 ---
 
 ## 🎓 **Learning Outcomes**
@@ -369,14 +311,3 @@ Original concept by **ChisomJude** - Cloud Native Series
 - 🌐 Live Demo: [Student Tracker App](http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com)
 
 ---
-
-## 🔄 **Version History**
-
-- **v2.0.0** - AWS ECS deployment with full CI/CD
-- **v1.5.0** - Docker containerization
-- **v1.0.0** - Initial FastAPI application
-- **v0.1.0** - Project inception from ChisomJude's template
-
----
-
-*This project showcases enterprise-grade DevOps practices with modern cloud-native technologies. Perfect for learning containerization, CI/CD automation, and AWS cloud deployment patterns.* 🚀
