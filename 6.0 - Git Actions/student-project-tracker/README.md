@@ -22,16 +22,6 @@ A modern FastAPI web application for registering students and tracking their wee
 
 ## 🏗️ **Architecture Overview**
 
-### **Infrastructure Components:**
-- **🐳 Containerization**: Docker with multi-stage builds
-- **🔄 CI/CD**: GitHub Actions with automated workflows
-- **☁️ Container Orchestration**: AWS ECS Fargate (serverless containers)
-- **📦 Container Registry**: Amazon ECR (private registry)
-- **⚖️ Load Balancing**: Application Load Balancer with health checks
-- **🔐 Secrets Management**: HashiCorp Vault integration
-- **💾 Database**: MongoDB Atlas with secure connections
-- **🔍 Monitoring**: CloudWatch logs and container insights
-
 ### **Deployment Flow:**
 ```
 GitHub Push → GitHub Actions → Build & Test → Push to ECR → Deploy to ECS → Health Checks → Live!
@@ -154,6 +144,158 @@ Located in `.github/workflows/student-tracker-ci_cd.yml`
 
 ---
 
+## ☁️ **AWS ECS Setup Guide**
+
+### **Prerequisites:**
+- AWS Account with programmatic access
+- AWS CLI configured with appropriate permissions
+- Docker installed locally
+
+### **Step 1: Create ECR Repository**
+```bash
+# Login to AWS
+aws configure
+
+# Create ECR repository
+aws ecr create-repository --repository-name student_tracker --region us-east-1
+
+# Get login command and execute
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+```
+
+### **Step 2: Build and Push Docker Image**
+```bash
+# Build your Docker image
+docker build -t student_tracker .
+
+# Tag for ECR
+docker tag student_tracker:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/student_tracker:latest
+
+# Push to ECR
+docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/student_tracker:latest
+```
+
+### **Step 3: Create ECS Cluster**
+**Via AWS Console:**
+1. **ECS Console** → **Clusters** → **Create Cluster**
+2. **Cluster name**: `student_tracker_cluster`
+3. **Infrastructure**: AWS Fargate (serverless)
+4. **Monitoring**: Enable Container Insights
+5. **Create**
+
+### **Step 4: Create Task Definition**
+**Via AWS Console:**
+1. **ECS Console** → **Task definitions** → **Create new task definition**
+2. **Task definition family**: `student_tracker_task`
+3. **Launch type**: AWS Fargate
+4. **Operating system**: Linux/X86_64
+5. **CPU**: 0.25 vCPU, **Memory**: 0.5 GB
+
+**Container Definition:**
+- **Container name**: `student_tracker_container`
+- **Image URI**: `<account-id>.dkr.ecr.us-east-1.amazonaws.com/student_tracker:latest`
+- **Port mappings**: Container port `8000`, Protocol `TCP`
+
+**Environment Variables:**
+```bash
+VAULT_ADDR=http://44.204.193.107:8200
+VAULT_ROLE_ID=your-role-id
+VAULT_SECRET_ID=your-secret-id
+```
+
+### **Step 5: Create Application Load Balancer**
+**Via AWS Console:**
+1. **EC2 Console** → **Load Balancers** → **Create Load Balancer**
+2. **Application Load Balancer** → **Create**
+3. **Name**: `student-tracker-alb`
+4. **Scheme**: Internet-facing
+5. **VPC**: Default VPC
+6. **Subnets**: Select all available subnets
+
+**Security Group:**
+- **Inbound rules**: HTTP (80) from 0.0.0.0/0
+- **Outbound rules**: All traffic
+
+**Target Group:**
+- **Target type**: IP addresses
+- **Protocol**: HTTP, **Port**: 8000
+- **Health check path**: `/docs`
+
+### **Step 6: Create ECS Service**
+**Via AWS Console:**
+1. **ECS Console** → **Clusters** → **student_tracker_cluster** → **Services** → **Create**
+2. **Environment**: AWS Fargate
+3. **Task definition**: `student_tracker_task:latest`
+4. **Service name**: `student_tracker_service`
+5. **Desired tasks**: 1
+
+**Load balancing:**
+- **Load balancer type**: Application Load Balancer
+- **Load balancer**: `student-tracker-alb`
+- **Container**: `student_tracker_container 8000:8000`
+- **Target group**: Create new or select existing
+
+### **Step 7: Configure IAM Permissions**
+**Required IAM Policies for GitHub Actions:**
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ecr:*",
+                "ecs:*",
+                "iam:PassRole"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+**Attach to your IAM user:**
+- `AmazonECS_FullAccess`
+- `AmazonEC2ContainerRegistryPowerUser`
+
+### **Step 8: GitHub Actions Secrets**
+**Add these secrets to your GitHub repository:**
+- `AWS_ACCESS_KEY_ID`: Your AWS access key
+- `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+
+### **Step 9: Verify Deployment**
+```bash
+# Check ECS service status
+aws ecs describe-services --cluster student_tracker_cluster --services student_tracker_service
+
+# Get load balancer DNS
+aws elbv2 describe-load-balancers --names student-tracker-alb
+```
+
+### **Troubleshooting Common Issues:**
+
+#### **1. Task Fails to Start:**
+- Check CloudWatch logs: `/ecs/student_tracker_task`
+- Verify environment variables are set correctly
+- Ensure Docker image exists in ECR
+
+#### **2. Health Check Failures:**
+- Verify target group health check path (`/docs`)
+- Check security group allows traffic on port 8000
+- Ensure application responds on `/docs` endpoint
+
+#### **3. Load Balancer Connection Issues:**
+- Security group must allow HTTP (80) from 0.0.0.0/0
+- Target group must point to port 8000
+- Application must be listening on 0.0.0.0:8000
+
+#### **4. CI/CD Permission Issues:**
+- User needs `AmazonECS_FullAccess` policy
+- Task execution role needs `AmazonECSTaskExecutionRolePolicy`
+- Service-linked role `AWSServiceRoleForECS` must exist
+
+---
+
 ## ☁️ **AWS ECS Deployment**
 
 ### **Infrastructure Components:**
@@ -188,18 +330,6 @@ Located in `.github/workflows/student-tracker-ci_cd.yml`
 VAULT_ADDR=http://44.204.193.107:8200    # Vault server URL
 VAULT_ROLE_ID=xxx                        # AppRole role ID
 VAULT_SECRET_ID=xxx                      # AppRole secret ID
-```
-
-### **Docker Configuration:**
-```dockerfile
-# Multi-stage build for optimization
-FROM python:3.10-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
@@ -247,61 +377,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
    git push origin production
    ```
 
-2. **Monitor GitHub Actions:**
-   - Visit: [GitHub Actions](https://github.com/DAMILARE1012/CloudNative-DevOps-Portfolio/actions)
-   - Watch pipeline execution
-   - Verify all stages pass
-
-3. **Verify Deployment:**
-   - Check ECS service status
-   - Test application endpoints
-   - Monitor health checks
-
 ---
-
-## 🎓 **Learning Outcomes**
-
-This project demonstrates mastery of:
-
-### **DevOps Practices:**
-- ✅ Infrastructure as Code
-- ✅ Continuous Integration/Deployment
-- ✅ Container Orchestration
-- ✅ Monitoring & Observability
-- ✅ Security Best Practices
-
-### **Cloud Technologies:**
-- ✅ AWS ECS/Fargate
-- ✅ Application Load Balancer
-- ✅ Amazon ECR
-- ✅ CloudWatch
-- ✅ IAM & Security Groups
-
-### **Development Tools:**
-- ✅ Docker & Containerization
-- ✅ GitHub Actions
-- ✅ FastAPI Framework
-- ✅ HashiCorp Vault
-- ✅ MongoDB Integration
-
----
-
-## 🤝 **Contributing**
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Submit Pull Request
-
----
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 👨‍💻 **Built By**
 
 **DAMILARE1012** - Cloud Native DevOps Portfolio Project  

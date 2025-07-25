@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel</title>
+    <style>
+        table { border-collapse: collapse; width: 80%; margin: auto; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background: #333; color: white; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Admin Panel - Student Progress</h1>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Progress</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ student.name }}</td>
+                <td>
+                    {% if student.progress %}
+                        {% for week, status in student.progress.items() %}
+                            <strong>{{ week }}</strong>: {{ status }}<br>
+                        {% endfor %}
+                    {% else %}
+                        No progress recorded yet
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

@@ -1,6 +1,7 @@
 from app.database import student_collection
 from app.models import Student
 from uuid import uuid4
+from typing import List  # Added this for Version 2.0
 
 async def create_student(name: str):
     student_id = str(uuid4())
@@ -20,6 +21,14 @@ async def update_student_progress(name: str, week: str, status: str):
        return None
     return await student_collection.find_one({"name" : name})
 
-
 async def count_students():
     return await student_collection.count_documents({})
+
+# added Admin CRUD operations - Get all students
+
+async def get_all_students():
+    students_cursor = student_collection.find({})
+    students = []
+    async for student in students_cursor:
+        students.append(student)
+    return students
