@@ -112,6 +112,10 @@ jobs:
         aws ecs describe-task-definition \
           --task-definition $ECS_TASK_DEFINITION \
           --query taskDefinition > task-definition.json
+        
+        # Remove unsupported fields that cause deployment issues
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection)' task-definition.json > task-definition-clean.json
+        mv task-definition-clean.json task-definition.json
           
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
@@ -122,7 +126,7 @@ jobs:
         image: ${{ needs.build.outputs.image }}
         
     - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: ${{ env.ECS_SERVICE }}
