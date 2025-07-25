@@ -2,6 +2,8 @@
 
 A modern FastAPI web application for registering students and tracking their weekly progress during the Cloud Native Series. This project demonstrates a complete DevOps pipeline with containerization, CI/CD automation, and cloud deployment.
 
+*Last updated: July 25, 2025 - ECS permissions configured*
+
 ## 🌟 **Live Application**
 **🔗 Production URL**: [http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com](http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com)  
 **📚 API Documentation**: [http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com/docs](http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com/docs)
