@@ -93,3 +93,4 @@ You can deploy the app on platforms like:
 This project is used for learning cloud-native tools and Handson-Project.
 
 Feel free to fork and extend it!
+# CI/CD Pipeline Test
