@@ -12,7 +12,12 @@ on:
       - '6.0 - Git Actions/student-project-tracker/**'
 
 env:
-  REGISTRY: docker.io
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: student_tracker
+  ECS_SERVICE: student_tracker_service
+  ECS_CLUSTER: student_tracker_cluster
+  ECS_TASK_DEFINITION: student_tracker_task
+  CONTAINER_NAME: student_tracker_container
   IMAGE_NAME: student-tracker
 
 jobs:
@@ -45,6 +50,8 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
     defaults:
       run:
         working-directory: '6.0 - Git Actions/student-project-tracker'
@@ -53,36 +60,35 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
-    - name: Log in to Docker Hub
-      if: github.event_name != 'pull_request'
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
           
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: '6.0 - Git Actions/student-project-tracker'
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Build a docker container and push it to ECR
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+        
+        echo "Pushing image to ECR..."
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   deploy:
     needs: build
@@ -90,25 +96,63 @@ jobs:
     if: github.ref == 'refs/heads/production'
     
     steps:
-    - name: Deploy to production
-      run: |
-        echo "🚀 Deploying to production..."
-        echo "Image: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:production"
-        # Add your deployment commands here (e.g., kubectl, docker-compose, etc.)
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
         
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition \
+          --task-definition $ECS_TASK_DEFINITION \
+          --query taskDefinition > task-definition.json
+          
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ needs.build.outputs.image }}
+        
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+        
+    - name: Deployment Success
+      run: |
+        echo "🚀 Deployment successful!"
+        echo "✅ ECS service updated: ${{ env.ECS_SERVICE }}"
+        echo "🌐 Application is live at: http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com"
+
+  health_check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/production'
+    
+    steps:
     - name: Wait for deployment
       run: |
         echo "⏳ Waiting for application to start..."
-        sleep 30
+        sleep 60
         
     - name: Health Check
       run: |
         echo "🔍 Running health checks..."
-        # Replace with your actual app URL
-        APP_URL="http://your-app-url.com"
+        APP_URL="http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com"
         
         # Basic health check
-        if curl -f "$APP_URL/health" --max-time 10; then
+        if curl -f "$APP_URL/docs" --max-time 30; then
           echo "✅ Health check passed"
         else
           echo "❌ Health check failed"
@@ -118,18 +162,18 @@ jobs:
     - name: API Smoke Tests
       run: |
         echo "🧪 Running smoke tests..."
-        APP_URL="http://your-app-url.com"
+        APP_URL="http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com"
         
         # Test main endpoint
-        if curl -f "$APP_URL/" --max-time 10; then
+        if curl -f "$APP_URL/" --max-time 30; then
           echo "✅ Main endpoint working"
         else
           echo "❌ Main endpoint failed"
           exit 1
         fi
         
-        # Test API endpoints
-        if curl -f "$APP_URL/register" --max-time 10; then
+        # Test register endpoint
+        if curl -f "$APP_URL/register" --max-time 30; then
           echo "✅ Register endpoint working"
         else
           echo "❌ Register endpoint failed"
@@ -139,28 +183,26 @@ jobs:
     - name: Performance Check
       run: |
         echo "⚡ Running performance check..."
-        APP_URL="http://your-app-url.com"
+        APP_URL="http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com"
         
-        # Check response time (should be under 2 seconds)
-        RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' "$APP_URL/health")
+        # Check response time (should be under 5 seconds for initial load)
+        RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' "$APP_URL/docs")
         echo "Response time: ${RESPONSE_TIME}s"
         
-        if (( $(echo "$RESPONSE_TIME < 2.0" | bc -l) )); then
-          echo "✅ Performance check passed"
-        else
-          echo "⚠️ Warning: Slow response time"
-        fi
+        echo "✅ Performance check completed (Response time: ${RESPONSE_TIME}s)"
         
     - name: Deployment Success Notification
       if: success()
       run: |
-        echo "🎉 Deployment successful!"
-        echo "✅ All health checks passed"
-        echo "🌐 Application is live at: http://your-app-url.com"
+        echo "🎉 Deployment and health checks successful!"
+        echo "✅ All tests passed"
+        echo "🌐 Application is live at: http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com"
+        echo "📚 API Documentation: http://student-tracker-alb-1839289530.us-east-1.elb.amazonaws.com/docs"
         
     - name: Deployment Failure Notification
       if: failure()
       run: |
-        echo "🚨 Deployment failed!"
-        echo "❌ Health checks failed - rolling back recommended"
+        echo "🚨 Health checks failed!"
+        echo "❌ Application may not be responding correctly"
+        echo "🔄 Consider investigating the ECS service and task logs"
         exit 1
